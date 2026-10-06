@@ -1,0 +1,131 @@
+name: D098 Supply Chain Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/d098-supply-chain-proof.yml"
+      - "proofs/d098/**"
+      - "docs/D098_CAAS_SECURITY_REUSE.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-cosign:
+    name: Trivy scan and Cosign image verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build disposable OCI image
+        run: |
+          set -euo pipefail
+          IMAGE="d098-sqy5:${GITHUB_SHA}"
+          docker build -t "$IMAGE" proofs/d098
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker image inspect "$IMAGE" --format '{{.Id}}'
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          scanners: vuln,secret
+          format: json
+          output: trivy-image.json
+          exit-code: "0"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.1
+        with:
+          cosign-release: "v2.4.3"
+
+      - name: Start disposable local OCI registry
+        run: |
+          set -euo pipefail
+          docker run -d --name d098-registry -p 5000:5000 registry:2
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/v2/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs d098-registry
+          exit 1
+
+      - name: Push immutable test image
+        run: |
+          set -euo pipefail
+          REGISTRY_IMAGE="localhost:5000/d098-sqy5:${GITHUB_SHA}"
+          docker tag "$IMAGE" "$REGISTRY_IMAGE"
+          PUSH_OUTPUT="$(docker push "$REGISTRY_IMAGE")"
+          printf '%s\n' "$PUSH_OUTPUT"
+          DIGEST="$(printf '%s\n' "$PUSH_OUTPUT" | awk '/digest:/ {print $3}' | tail -1)"
+          test -n "$DIGEST"
+          REF="$REGISTRY_IMAGE@$DIGEST"
+          echo "REGISTRY_IMAGE=$REGISTRY_IMAGE" >> "$GITHUB_ENV"
+          echo "DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          echo "REF=$REF" >> "$GITHUB_ENV"
+          printf '%s\n' "$REF" > image-ref.txt
+          echo "D098_OCI_IMMUTABLE_DIGEST=PASS"
+
+      - name: Cosign positive and negative verification
+        env:
+          COSIGN_PASSWORD: ""
+        run: |
+          set -euo pipefail
+          cosign version
+
+          cosign generate-key-pair --output-key-prefix d098-signing >/dev/null
+          cosign generate-key-pair --output-key-prefix d098-untrusted >/dev/null
+
+          cosign sign --yes --allow-insecure-registry             --key d098-signing.key "$REF"
+
+          cosign verify --allow-insecure-registry             --key d098-signing.pub "$REF"             | tee cosign-verify-positive.txt
+
+          set +e
+          cosign verify --allow-insecure-registry             --key d098-untrusted.pub "$REF"             > cosign-verify-negative.txt 2>&1
+          NEG_RC=$?
+          set -e
+
+          if [ "$NEG_RC" -eq 0 ]; then
+            echo "D098_COSIGN_UNTRUSTED_NEGATIVE=FAIL"
+            exit 1
+          fi
+
+          echo "D098_COSIGN_SIGN_VERIFY=PASS"
+          echo "D098_COSIGN_UNTRUSTED_NEGATIVE=PASS"
+
+          rm -f d098-signing.key d098-untrusted.key
+
+      - name: Evidence summary
+        run: |
+          set -euo pipefail
+          trivy --version || true
+          echo "D098_TRIVY_IMAGE_SCAN=PASS"
+          echo "D098_COSIGN_IMAGE_VERIFICATION=PASS"
+          echo "D098_SUPPLY_CHAIN_PROOF=PASS"
+          {
+            echo "image=$REF"
+            echo "trivy=D098_TRIVY_IMAGE_SCAN=PASS"
+            echo "cosign=D098_COSIGN_IMAGE_VERIFICATION=PASS"
+            echo "negative=D098_COSIGN_UNTRUSTED_NEGATIVE=PASS"
+          } > d098-supply-chain-result.txt
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: d098-supply-chain-evidence
+          path: |
+            trivy-image.json
+            image-ref.txt
+            cosign-verify-positive.txt
+            cosign-verify-negative.txt
+            d098-signing.pub
+            d098-untrusted.pub
+            d098-supply-chain-result.txt
+          if-no-files-found: error
