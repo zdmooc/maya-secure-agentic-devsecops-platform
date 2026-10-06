@@ -102,6 +102,35 @@ jobs:
 
           rm -f d098-signing.key d098-untrusted.key
 
+      - name: Kyverno policy positive and negative proof
+        run: |
+          set -euo pipefail
+          KYVERNO_TAG="v1.19.1"
+          KYVERNO_VERSION="${KYVERNO_TAG#v}"
+          curl -fsSL -o /tmp/kyverno.tgz             "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_TAG}/kyverno-cli_${KYVERNO_TAG}_linux_x86_64.tar.gz"
+          tar -xzf /tmp/kyverno.tgz -C /tmp
+          install /tmp/kyverno /usr/local/bin/kyverno
+          kyverno version
+
+          kyverno apply proofs/d098/kyverno/disallow-latest.yaml             --resource proofs/d098/kyverno/good-pod.yaml             | tee kyverno-positive.txt
+          grep -Eq 'pass:[[:space:]]*[1-9]' kyverno-positive.txt
+
+          set +e
+          kyverno apply proofs/d098/kyverno/disallow-latest.yaml             --resource proofs/d098/kyverno/bad-pod.yaml             > kyverno-negative.txt 2>&1
+          BAD_RC=$?
+          set -e
+          cat kyverno-negative.txt
+
+          if ! grep -Eq 'fail:[[:space:]]*[1-9]' kyverno-negative.txt; then
+            echo "D098_KYVERNO_NEGATIVE=FAIL"
+            exit 1
+          fi
+
+          echo "D098_KYVERNO_POSITIVE=PASS"
+          echo "D098_KYVERNO_NEGATIVE=PASS"
+          echo "kyverno_bad_rc=$BAD_RC" >> kyverno-result.txt
+          echo "D098_KYVERNO_POLICY_PROOF=PASS" >> kyverno-result.txt
+
       - name: Evidence summary
         run: |
           set -euo pipefail
@@ -128,4 +157,7 @@ jobs:
             d098-signing.pub
             d098-untrusted.pub
             d098-supply-chain-result.txt
+            kyverno-positive.txt
+            kyverno-negative.txt
+            kyverno-result.txt
           if-no-files-found: error
