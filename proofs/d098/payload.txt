@@ -1,0 +1,2 @@
+D-098 SQY-5 disposable OCI payload.
+No application runtime or customer data.
