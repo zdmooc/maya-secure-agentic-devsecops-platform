@@ -10,6 +10,16 @@
 
 This repository is intentionally created now to capture the complete target scope, architecture, roadmap, controls, ADRs, demo scenario and evidence model. It must **not** be presented as implemented, tested, deployed or production-ready until runtime evidence exists.
 
+## D-098 — bounded reuse for CaaS security
+
+D-098 reuses only generic container/Kubernetes supply-chain controls from this repository:
+Trivy, SBOM, Cosign/signature patterns, Kyverno admission and OpenShift runtime-security patterns.
+
+Mission mapping:
+- `docs/D098_CAAS_SECURITY_REUSE.md`.
+
+The Agentic AI-specific program remains separate and is not promoted by D-098.
+
 ## Why this repository exists
 
 The portfolio already contains:
