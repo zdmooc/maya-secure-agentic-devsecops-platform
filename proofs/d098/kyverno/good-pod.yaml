@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: d098-good
+spec:
+  containers:
+    - name: app
+      image: registry.example.test/platform/app:1.2.3
