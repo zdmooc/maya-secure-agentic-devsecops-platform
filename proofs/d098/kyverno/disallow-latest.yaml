@@ -1,0 +1,20 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: d098-disallow-latest
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: require-immutable-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "D-098: mutable :latest images are not allowed"
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
