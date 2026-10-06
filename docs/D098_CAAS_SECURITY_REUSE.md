@@ -1,6 +1,6 @@
 # D-098 — Reusable CaaS Security / Supply-Chain Controls
 
-**Status:** DESIGN_REUSE_READY / RUNTIME ENFORCEMENT PENDING
+**Status:** D-098 BOUNDED SUPPLY-CHAIN PROOF PASSED / CLUSTER-SIDE KYVERNO ADMISSION NOT CLAIMED
 
 ## Purpose
 
@@ -64,3 +64,23 @@ Cosign/Kyverno manifests or ADRs alone are not enforcement evidence.
 
 This document prepares the security part of:
 `CAAS_SECOPS_OBSERVABILITY_PACK_READY`.
+
+
+## D-098 runtime/CI result — 2026-10-06
+
+Public GitHub Actions run `37517552045` passed on
+`e4f73d3e66f4aa1c751273276b2df198ef8c709e`.
+
+Observed:
+- Trivy 0.70.0 image scan PASS;
+- immutable OCI digest PASS;
+- Cosign v2.4.3 sign/verify PASS;
+- untrusted Cosign key negative test PASS;
+- Kyverno v1.19.1 positive policy test PASS;
+- Kyverno negative policy test PASS.
+
+Canonical evidence:
+`evidence/D098_SUPPLY_CHAIN_PROOF_2026-10-06.md`.
+
+This is sufficient for the D-098 supply-chain proof slice.
+Cluster-side Kyverno admission remains a separate non-claim; OpenShift SCC runtime admission is proven in the CaaS flagship repository.
