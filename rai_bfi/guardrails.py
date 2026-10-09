@@ -19,7 +19,7 @@ INJECTION = (
 OUTPUT_DLP = (
     ("EMAIL", re.compile(r"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b", re.I)),
     ("SECRET_ASSIGNMENT", re.compile(r"\b(?:password|api[_-]?key|access[_-]?token)\s*[:=]\s*[^\s,}]{5,}", re.I)),
-    ("PRIVATE_KEY", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+    ("PRIVATE_KEY", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", re.I)),
 )
 ALLOWED_STATES = frozenset({"ANSWER", "ABSTAIN", "ESCALATE"})
 
@@ -50,7 +50,7 @@ def evaluate_text(text: object, *, boundary: str, max_chars: int = 6000) -> Guar
         if hits:
             return GuardrailResult(False, "SUSPICIOUS_INSTRUCTION", hits)
     if boundary in ("tool_result", "llm_output"):
-        findings = tuple(name for name, pattern in OUTPUT_DLP if pattern.search(text))
+        findings = tuple(name for name, pattern in OUTPUT_DLP if pattern.search(normalized))
         if findings:
             return GuardrailResult(False, "SENSITIVE_OUTPUT", findings)
     return GuardrailResult(True, "PASS")
@@ -64,7 +64,7 @@ def validate_structured_answer(value: object) -> GuardrailResult:
             return GuardrailResult(False, "INVALID_JSON")
     if not isinstance(value, dict) or set(value) != {"status", "answer", "evidence_refs"}:
         return GuardrailResult(False, "SCHEMA_MISMATCH")
-    if value["status"] not in ALLOWED_STATES:
+    if not isinstance(value["status"], str) or value["status"] not in ALLOWED_STATES:
         return GuardrailResult(False, "INVALID_STATUS")
     if not isinstance(value["answer"], str):
         return GuardrailResult(False, "INVALID_ANSWER")
