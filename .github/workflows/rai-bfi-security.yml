@@ -6,6 +6,7 @@ on:
       - 'redteam/rai-bfi-2026/**'
       - 'tests/test_rai_bfi.py'
       - 'scripts/rai_bfi_validate.py'
+      - 'scripts/rai_bfi_demo.py'
       - 'docs/missions/responsible-ai-bfi-2026/**'
       - '.github/workflows/rai-bfi-security.yml'
   push:
@@ -30,5 +31,7 @@ jobs:
           python-version: '3.11'
       - name: Synthetic security controls and adversarial tests
         run: python -m unittest discover -s tests -p 'test_rai_bfi.py' -v
+      - name: Offline synthetic security demonstration
+        run: python -m scripts.rai_bfi_demo
       - name: Controls/evidence integrity
         run: python scripts/rai_bfi_validate.py
