@@ -34,6 +34,19 @@ class GuardrailTests(unittest.TestCase):
             with self.subTest(candidate=bad):
                 self.assertFalse(validate_structured_answer(bad).allowed)
 
+    def test_malformed_output_never_crashes(self):
+        for value in (
+            {"status": [], "answer": "ok", "evidence_refs": []},
+            {"status": {}, "answer": "ok", "evidence_refs": []},
+            {"status": "ANSWER", "answer": "ok", "evidence_refs": [{"url": "repo:x"}]},
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(validate_structured_answer(value).allowed)
+
+    def test_zero_width_dlp_evasion(self):
+        self.assertEqual(evaluate_text("john\u200b.doe@example.test", boundary="llm_output").code,
+                         "SENSITIVE_OUTPUT")
+
     def test_limits(self):
         self.assertEqual(evaluate_text("x"*6001, boundary="user_input").code, "SIZE_LIMIT")
         self.assertEqual(evaluate_text("hello", boundary="unknown").code, "UNSUPPORTED_BOUNDARY")
@@ -84,6 +97,15 @@ class ToolPolicyTests(unittest.TestCase):
                              {"payment":"synthetic-123"} if args is None else args,
                              reviewer="security-reviewer", nonce=nonce, expires_at=expiry,
                              signing_key=KEY)
+
+    def test_invalid_trust_inputs_fail_closed(self):
+        self.assertEqual(self.call(authenticated="yes").code, "UNAUTHENTICATED")
+        self.assertEqual(self.call(caller=None).code, "UNAUTHENTICATED")
+        self.assertEqual(self.call(scopes=None).code, "INSUFFICIENT_SCOPE")
+
+    def test_fake_approval_object_denied(self):
+        self.assertEqual(self.call(tool="payment.restart", args={"payment":"synthetic-123"},
+                                   approval={"approved": True}).code, "BAD_APPROVAL_TYPE")
 
     def test_mutation_needs_review(self):
         self.assertEqual(self.call(tool="payment.restart", args={"payment":"synthetic-123"}).code,
