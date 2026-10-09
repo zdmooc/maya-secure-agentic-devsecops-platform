@@ -73,7 +73,7 @@ class PolicyEngine:
                   tenant: str, scopes: frozenset[str], tool: str, arguments: dict,
                   approval: ApprovalTicket | None = None, now: int | None = None) -> Decision:
         # No model-provided identity, scope, approval flag or tool description is trusted.
-        if not authenticated or not caller:
+        if authenticated is not True or not isinstance(caller, str) or not caller.strip():
             return Decision(False, "UNAUTHENTICATED")
         if agent.state != "DEPLOYED":
             return Decision(False, "AGENT_NOT_ACTIVE")
@@ -82,7 +82,7 @@ class PolicyEngine:
         if tool not in self.tools or tool not in agent.allowed_tools:
             return Decision(False, "TOOL_NOT_ALLOWED")
         policy = self.tools[tool]
-        if not policy.required_scopes.issubset(scopes):
+        if not isinstance(scopes, frozenset) or not policy.required_scopes.issubset(scopes):
             return Decision(False, "INSUFFICIENT_SCOPE")
         if not isinstance(arguments, dict):
             return Decision(False, "INVALID_ARGUMENTS")
@@ -94,6 +94,10 @@ class PolicyEngine:
             return Decision(True, "ALLOW")
         if approval is None:
             return Decision(False, "APPROVAL_REQUIRED")
+        if not isinstance(approval, ApprovalTicket):
+            return Decision(False, "BAD_APPROVAL_TYPE")
+        if not isinstance(approval.signature, str):
+            return Decision(False, "BAD_APPROVAL_SIGNATURE")
         if len(self.signing_key) < 32:
             return Decision(False, "UNTRUSTED_APPROVAL_KEY")
         sig = hmac.new(self.signing_key, _ticket_bytes(approval), hashlib.sha256).hexdigest()
