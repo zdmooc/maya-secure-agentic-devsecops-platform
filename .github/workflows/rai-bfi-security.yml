@@ -1,0 +1,34 @@
+name: Responsible AI BFI - bounded CI
+on:
+  pull_request:
+    paths:
+      - 'rai_bfi/**'
+      - 'redteam/rai-bfi-2026/**'
+      - 'tests/test_rai_bfi.py'
+      - 'scripts/rai_bfi_validate.py'
+      - 'docs/missions/responsible-ai-bfi-2026/**'
+      - '.github/workflows/rai-bfi-security.yml'
+  push:
+    branches: ['feat/responsible-ai-bfi-2026']
+    paths:
+      - 'rai_bfi/**'
+      - 'redteam/rai-bfi-2026/**'
+      - 'tests/test_rai_bfi.py'
+      - 'scripts/rai_bfi_validate.py'
+      - 'docs/missions/responsible-ai-bfi-2026/**'
+      - '.github/workflows/rai-bfi-security.yml'
+permissions:
+  contents: read
+jobs:
+  responsible-ai-bfi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Synthetic security controls and adversarial tests
+        run: python -m unittest discover -s tests -p 'test_rai_bfi.py' -v
+      - name: Controls/evidence integrity
+        run: python scripts/rai_bfi_validate.py
