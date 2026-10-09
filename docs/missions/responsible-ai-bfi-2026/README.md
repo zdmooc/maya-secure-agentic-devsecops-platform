@@ -32,7 +32,7 @@ Le programme générique I0–I12 est distinct : le pack mission ne ferme pas au
 - Code : [guardrails](../../../rai_bfi/guardrails.py), [autorisation/HITL](../../../rai_bfi/policy.py), [registry](../../../rai_bfi/registry.py).
 - [Corpus adversarial](../../../redteam/rai-bfi-2026/attack_cases.json), [tests unittest](../../../tests/test_rai_bfi.py) et workflow GitHub Actions RAI BFI.
 
-Exécution locale : lancer **python -m unittest discover -s tests -p 'test_rai_bfi.py' -v**, puis **python scripts/rai_bfi_validate.py** depuis la racine.
+Exécution locale : lancer **python -m unittest discover -s tests -p 'test_rai_bfi.py' -v**, puis **python -m scripts.rai_bfi_demo** et **python scripts/rai_bfi_validate.py** depuis la racine.
 
 ## Vérité des preuves
 DESIGNED ≠ IMPLEMENTED ≠ CI_VERIFIED ≠ CRC_RUNTIME_PROVEN ≠ PRODUCTION_OPERATED. Les patterns lexicaux du module ne sont pas un produit DLP ou un moteur anti-jailbreak complet. Les tests synthétiques ne valident pas le transport A2A, mTLS, la sécurité de production, une conformité juridique ou une transaction financière réelle.
