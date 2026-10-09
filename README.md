@@ -1,3 +1,11 @@
+## Responsible AI / Sécurité des agents — candidature BFI — 2026-10-09
+
+Un pack **mission-specific** isolé est disponible sous [docs/missions/responsible-ai-bfi-2026/](docs/missions/responsible-ai-bfi-2026/). Il fournit matrice de contrôles, documents de revue, guide MCP/A2A, corpus adversarial, bibliothèques Python de contrôle déterministe, 25 tests, CI GitHub et démonstration hors ligne. CI initiale SUCCESS : [run 37902017400](https://github.com/zdmooc/maya-secure-agentic-devsecops-platform/actions/runs/37902017400). **La validation CRC RAI-07 reste PENDING.**
+
+Ce pack ne change pas le statut global du programme I0–I12 **DESIGN BASELINE** et ne clôt pas D-092 A2A live ou D-099 AA3/AA7. Le travail D-099 se poursuit indépendamment dans sa propre branche.
+
+---
+
 # Maya Secure Agentic DevSecOps Platform
 
 **Enterprise Secure Agentic DevSecOps Reference Platform**
