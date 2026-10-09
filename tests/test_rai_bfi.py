@@ -7,6 +7,7 @@ from pathlib import Path
 from rai_bfi.guardrails import evaluate_text, validate_structured_answer
 from rai_bfi.policy import Agent, Tool, PolicyEngine, mint_approval
 from rai_bfi.registry import AgentRegistry
+from scripts.rai_bfi_demo import demo
 
 BASE = Path(__file__).resolve().parents[1]
 KEY = b"synthetic-test-signing-key-32bytes--never-reuse"
@@ -179,6 +180,13 @@ class RegistryTests(unittest.TestCase):
         reg.register(agent)
         with self.assertRaises(ValueError):
             reg.register(agent)
+
+class SyntheticDemoTests(unittest.TestCase):
+    def test_end_to_end_synthetic_demo(self):
+        run = demo()
+        self.assertEqual(run["scope"], "SYNTHETIC_OFFLINE_NOT_CRC")
+        self.assertEqual(run["status"], "PASS")
+        self.assertEqual(len(run["decisions"]), 9)
 
 if __name__ == "__main__":
     unittest.main()
