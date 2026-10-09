@@ -27,7 +27,17 @@
 3. A2A D-092 : https://github.com/zdmooc/TradeOps-GenAI-Integration/blob/main/docs/39-a2a-interoperability-d092.md — implémentation/CI ; live peer auth NON PROUVÉE.
 4. D-099 : https://github.com/zdmooc/maya-ai-agentic-architecture-reference/tree/d099-aa0-aa2-method-contracts — travail en cours ; benchmark AA3 non homologué.
 
-**CI du présent pack : à compléter après observation des runs.** Ne pas utiliser le succès d'autres dépôts comme preuve d'exécution de ce module.
+## Résultat GitHub Actions observé le 09/10/2026
+
+- **Workflow :** Responsible AI BFI - bounded CI ;
+- **Run :** https://github.com/zdmooc/maya-secure-agentic-devsecops-platform/actions/runs/37902017400 ;
+- **Commit exécuté :** d7242fe8296c4e5ededfd7f3a29b3231e53dbc13 ;
+- **Résultat : SUCCESS** — 25 tests unittest **OK** ;
+- **Démonstration hors ligne : PASS**, scope SYNTHETIC_OFFLINE_NOT_CRC, neuf décisions positives/négatives attendues ;
+- **Validation structure + matrice : PASS**, gate RAI_BFI_STATIC_AND_TEST_CONTRACT ;
+- **Portée :** CI Python 3.11, données synthétiques, sans A2A réseau, sans vraie AuthN d'agent, sans outil externe et sans exécution CRC.
+
+Les mises à jour documentaires de ce fichier doivent faire l'objet d'un run CI ultérieur si HEAD change ; ne pas prétendre que le run ci-dessus valide automatiquement une version nouvelle du code. Aucun succès d'un autre dépôt n'est substitué à cette preuve.
 
 ## Données et traçabilité
 Aucun mot de passe ou token, aucune donnée client, aucun kubeconfig, aucun dump non expurgé ne doit être archivé. SHA des commits, run id, Python version, marqueurs PASS/FAIL et limites de preuve doivent être consignés.
