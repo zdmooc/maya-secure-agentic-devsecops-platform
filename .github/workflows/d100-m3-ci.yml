@@ -194,10 +194,10 @@ jobs:
                  in m.get("artifact",{}).get("name","").lower()]
           assert bad, "Grype did not report HIGH/CRITICAL for log4j-core 2.14.1"
           ids=[m.get("vulnerability",{}).get("id","") for m in bad]
-          assert "CVE-2021-44228" in ids, f"Expected CVE-2021-44228, found: {ids}"
+          assert {"CVE-2021-44228","GHSA-jfh8-c2jp-5v3q"} & set(ids), f"Expected Log4Shell CVE/GHSA mapping, found: {ids}"
           print("D100_M3_GRYPE_HIGH_CRITICAL_NEGATIVE=PASS")
           print("D100_M3_GRYPE_GENUINE_REJECTION=PASS")
-          print("CVE-2021-44228 VERIFIED")
+          print("LOG4SHELL_GHSA_OR_CVE_VERIFIED=PASS")
           PY
       - name: Upload negative vulnerability proof
         if: always()
