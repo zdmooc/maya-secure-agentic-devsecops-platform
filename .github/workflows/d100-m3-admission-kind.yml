@@ -1,0 +1,82 @@
+name: D100 M3-I3 Kyverno Admission Runtime Kind
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/d100-m3-admission-kind.yml"
+      - "proofs/d100/admission/**"
+      - "scripts/d100-m3-admission-kind.sh"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/d100-m3-admission-kind.yml"
+      - "proofs/d100/admission/**"
+      - "scripts/d100-m3-admission-kind.sh"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kyverno-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      CI: "true"
+      D100_M3_CI_ONLY: "YES"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+      - uses: azure/setup-helm@v4.3.0
+        with:
+          version: v3.17.3
+      - name: Install temporary Kind CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSLo "$RUNNER_TEMP/bin/kind" \
+            https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+          chmod +x "$RUNNER_TEMP/bin/kind"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Validate fixtures and fail-closed execution guard
+        run: |
+          set -euo pipefail
+          bash -n scripts/d100-m3-admission-kind.sh
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python3 - <<'PY'
+          import yaml
+          from pathlib import Path
+          p=Path("proofs/d100/admission")
+          pol=yaml.safe_load((p/"policy.yaml").read_text())
+          good=yaml.safe_load((p/"good-pod.yaml").read_text())
+          bad=yaml.safe_load((p/"bad-pod.yaml").read_text())
+          assert pol["kind"]=="ClusterPolicy"
+          assert pol["spec"]["rules"][0]["validate"]["failureAction"]=="Enforce"
+          assert pol["spec"]["rules"][0]["match"]["any"][0]["resources"]["namespaces"]==["d100-m3-admission"]
+          assert "@sha256:" in good["spec"]["containers"][0]["image"]
+          assert ":latest" in bad["spec"]["containers"][0]["image"]
+          print("D100_M3_ADMISSION_STATIC_CONTRACT=PASS")
+          PY
+          if env CI=false D100_M3_CI_ONLY=NO bash scripts/d100-m3-admission-kind.sh; then
+            echo "D100_M3_NON_CI_GUARD=FAIL"
+            exit 1
+          fi
+          echo "D100_M3_NON_CI_GUARD=PASS"
+      - name: Execute Kubernetes admission positive and negative tests
+        run: |
+          set -euo pipefail
+          bash scripts/d100-m3-admission-kind.sh | tee "$RUNNER_TEMP/d100-m3.log"
+          mkdir -p evidence/d100-m3
+          grep '^D100_M3_.*=PASS' "$RUNNER_TEMP/d100-m3.log" > evidence/d100-m3/gates.txt
+          for gate in D100_M3_KYVERNO_WEBHOOK_READY D100_M3_DIGEST_ADMISSION_ACCEPT \
+            D100_M3_TAG_ADMISSION_REJECT D100_M3_VERSION_TAG_REJECT \
+            D100_M3_POLICY_NAMESPACE_SCOPE D100_M3_KYVERNO_KIND_ADMISSION_RUNTIME; do
+            grep -q "^$gate=PASS$" evidence/d100-m3/gates.txt
+          done
+      - name: Upload only safe gate markers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d100-m3-kyverno-admission-kind
+          path: evidence/d100-m3/gates.txt
+          if-no-files-found: warn
+          retention-days: 14
