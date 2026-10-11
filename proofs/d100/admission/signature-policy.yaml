@@ -1,0 +1,39 @@
+# Real signature verification (NOT digest syntax) on public signed demo fixture.
+# Source key and image fixture: Kyverno v1.15 Sigstore documentation.
+# No private key is stored; only a public verification key.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: d100-m3-cosign-signature
+spec:
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  rules:
+    - name: verify-image-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - d100-m3-admission
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/kyverno/test-verify-image*"
+          mutateDigest: false
+          verifyDigest: false
+          required: true
+          failureAction: Enforce
+          attestors:
+            - count: 1
+              entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8nXRh950IZbRj8Ra/N9sbqOPZrfM
+                      5/KAQN0/KjHcorm/J5yctVd7iEcnessRQjU917hmKO6JWVGHpDguIyakZA==
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true
