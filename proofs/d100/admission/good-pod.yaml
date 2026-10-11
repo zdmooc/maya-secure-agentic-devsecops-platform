@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: d100-m3-accepted
+  namespace: d100-m3-admission
+spec:
+  containers:
+    - name: fixture
+      image: docker.io/library/busybox@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      command: ["sleep", "3600"]
