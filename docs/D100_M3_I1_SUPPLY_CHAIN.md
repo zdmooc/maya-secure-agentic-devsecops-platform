@@ -1,6 +1,6 @@
 # D-100 M3 I1 — Syft, Grype et Checkov
 
-**État : CI_VERIFIED_BOUND_M3_I1 / PR_DRAFT / M3_NOT_CLOSED.** Aucune mutation CRC ou cloud.
+**État : CI_VERIFIED_BOUND_M3_I1_I2 / PR_DRAFT / M3_NOT_CLOSED.** Aucune mutation CRC ou cloud.
 
 ## Réutilisation
 
@@ -26,7 +26,7 @@ Checkov CI n'est PAS une admission réelle Kyverno sur OpenShift. Les mesures ac
 - [ ] Grype JSON produit et gate HIGH configuré
 - [ ] Checkov good 2/2 PASS, bad 2/2 FAIL, assertions PASS
 - [ ] Artefacts présents avec SHA/run
-- [ ] Grype HIGH-CVE negative proof sur fixture représentative (iteration suivante)
+- [x] Grype HIGH/CRITICAL negative proof sur fixture Log4j 2.14.1 — run 38145849723
 - [ ] Admission runtime testée réellement sous Kubernetes/OpenShift (autre itération après préflight)
 
 ## Preuve CI du 11 octobre 2026
@@ -39,3 +39,13 @@ Checkov CI n'est PAS une admission réelle Kyverno sur OpenShift. Les mesures ac
 - **Limites :** image `FROM scratch`, zéro CVE ne vaut pas test négatif de blocage d'une CVE HIGH ; `Kyverno CLI` D-098 ne vaut pas admission webhook OpenShift. Le registre et la signature sur une chaîne de promotion réelle ne sont pas testés dans cette itération.
 
 **Décision :** sous-gate `M3_I1_CI_VERIFIED` ; **D-100 M3 demeure OPEN**. Garder la PR #3 en brouillon jusqu'à revue ; le chantier suivant est l'extension Grype négative et l'intégration M2 selon signal mission.
+
+## M3-I2 — preuve Grype négative validée le 11 octobre 2026
+
+- **Workflow run :** [38145849723](https://github.com/zdmooc/maya-secure-agentic-devsecops-platform/actions/runs/38145849723) — conclusion **SUCCESS**, trois jobs verts, commit testé `fcafe813c21f324783e0eaef367780fb869a9321`.
+- **Fixture :** bibliothèque Apache `log4j-core-2.14.1.jar` téléchargée depuis Maven Central, contrôlée par SHA1 de publication, **non exécutée et non déployée**. Syft SPDX identifie `log4j-core` version `2.14.1`.
+- **Fail-hard négatif Grype :** `anchore/scan-action@v7`, cutoff HIGH et `fail-build=true`, rendu en échec attendu. L'étape de vérification contrôle l'issue réelle du scanner et la présence d'une vulnérabilité HIGH/CRITICAL sur l'artefact. La base Grype utilise l'alias `GHSA-jfh8-c2jp-5v3q` pour `CVE-2021-44228` (Log4Shell) ; les deux identifiants sont autorisés dans l'assertion, avec correspondance publique GitHub Advisory.
+- **Marqueurs observés :** `D100_M3_VULNERABLE_SBOM_PACKAGE=PASS`, `D100_M3_GRYPE_HIGH_CRITICAL_NEGATIVE=PASS`, `D100_M3_GRYPE_GENUINE_REJECTION=PASS`, `LOG4SHELL_GHSA_OR_CVE_VERIFIED=PASS`.
+- **Artefacts** : `d100-m3-grype-negative` ID `11704532166`, `d100-m3-sbom-grype` ID `11704362518`, `d100-m3-checkov` ID `11705210712`.
+
+**Verdict :** `M3_I1_I2_CI_VERIFIED` ; M3 **non clos**, absence de preuve d'admission Kyverno OpenShift avec image non fiable et absence d'une chaîne de promotion/signature M2 E2E. Prochaine validation runtime cluster seulement après contrôle capacité CRC et autorisation dédiée.
