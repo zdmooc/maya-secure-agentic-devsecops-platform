@@ -1,0 +1,130 @@
+name: D100 M3 Syft Grype Checkov Proof
+on:
+  pull_request:
+    paths: [".github/workflows/d100-m3-ci.yml", "proofs/d100/**", "proofs/d098/**"]
+  push:
+    branches: [main]
+    paths: [".github/workflows/d100-m3-ci.yml", "proofs/d100/**", "proofs/d098/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syft-grype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build disposable image
+        run: |
+          set -euo pipefail
+          docker build -t "d100-m3:$GITHUB_SHA" proofs/d098
+      - name: Syft SPDX JSON
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          image: d100-m3:${{ github.sha }}
+          format: spdx-json
+          output-file: d100-m3.spdx.json
+          upload-artifact: "false"
+          upload-release-assets: "false"
+      - name: Assert valid SPDX document
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("d100-m3.spdx.json").read_text())
+          assert data["spdxVersion"].startswith("SPDX-2")
+          assert data.get("creationInfo") and data.get("documentNamespace")
+          print("D100_M3_SBOM_VALID=PASS")
+          PY
+      - name: Grype scan and HIGH severity gate
+        uses: anchore/scan-action@v7
+        with:
+          sbom: d100-m3.spdx.json
+          fail-build: "true"
+          severity-cutoff: high
+          output-format: json
+          output-file: d100-m3-grype.json
+      - name: Assert Grype JSON exists
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("d100-m3-grype.json").read_text())
+          assert isinstance(data["matches"],list) and data.get("source")
+          print("D100_M3_GRYPE_REPORT=PASS")
+          print("SCOPE: scratch image; vulnerability negative test not yet proved")
+          PY
+      - name: Upload SBOM and scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d100-m3-sbom-grype
+          path: |
+            d100-m3.spdx.json
+            d100-m3-grype.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  checkov:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p reports
+      - name: Check compliant fixture
+        id: good
+        uses: bridgecrewio/checkov-action@v12.1347.0
+        with:
+          file: proofs/d100/good/Dockerfile
+          framework: dockerfile
+          check: CKV_DOCKER_2,CKV_DOCKER_3
+          soft_fail: "false"
+          skip_results_upload: "true"
+          output_format: json
+          output_file_path: reports/checkov-good.json,
+      - name: Deliberately reject insecure fixture
+        id: bad
+        continue-on-error: true
+        uses: bridgecrewio/checkov-action@v12.1347.0
+        with:
+          file: proofs/d100/bad/Dockerfile
+          framework: dockerfile
+          check: CKV_DOCKER_2,CKV_DOCKER_3
+          soft_fail: "false"
+          skip_results_upload: "true"
+          output_format: json
+          output_file_path: reports/checkov-bad.json,
+      - name: Assert actual Checkov positives and negatives
+        env:
+          GOOD_OUTCOME: ${{ steps.good.outcome }}
+          BAD_OUTCOME: ${{ steps.bad.outcome }}
+        run: |
+          set -euo pipefail
+          test "$GOOD_OUTCOME" = success
+          test "$BAD_OUTCOME" = failure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def checks(name):
+              data=json.loads((Path("reports")/name).read_text())
+              if isinstance(data,list):
+                  assert len(data)==1
+                  data=data[0]
+              return data["results"]
+          good=checks("checkov-good.json")
+          bad=checks("checkov-bad.json")
+          expected={"CKV_DOCKER_2","CKV_DOCKER_3"}
+          assert not good["failed_checks"]
+          assert expected <= {x["check_id"] for x in good["passed_checks"]}
+          assert expected <= {x["check_id"] for x in bad["failed_checks"]}
+          print("D100_M3_CHECKOV_PASS=PASS")
+          print("D100_M3_CHECKOV_REJECTION=PASS")
+          PY
+      - name: Upload Checkov evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d100-m3-checkov
+          path: reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
