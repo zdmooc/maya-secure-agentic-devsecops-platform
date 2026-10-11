@@ -82,14 +82,14 @@ jobs:
             -f proofs/d100/good/Dockerfile \
             --framework dockerfile \
             --check CKV_DOCKER_2,CKV_DOCKER_3 \
-            --no-guide -o json > reports/checkov-good.json
+            -o json > reports/checkov-good.json
 
           set +e
           docker run --rm -v "$PWD:/work" -w /work "$IMAGE" \
             -f proofs/d100/bad/Dockerfile \
             --framework dockerfile \
             --check CKV_DOCKER_2,CKV_DOCKER_3 \
-            --no-guide -o json > reports/checkov-bad.json
+            -o json > reports/checkov-bad.json
           BAD_RC=$?
           set -e
           test "$BAD_RC" -ne 0
