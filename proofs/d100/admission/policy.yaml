@@ -1,0 +1,28 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: d100-m3-require-digest
+  annotations:
+    policies.kyverno.io/title: D100 M3 digest-only test admission
+spec:
+  background: false
+  rules:
+    - name: require-image-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - d100-m3-admission
+      validate:
+        failureAction: Enforce
+        message: "D100-M3: all container images must be pinned by sha256 digest"
+        pattern:
+          spec:
+            containers:
+              - image: "*@sha256:*"
+            "=(initContainers)":
+              - image: "*@sha256:*"
+            "=(ephemeralContainers)":
+              - image: "*@sha256:*"
