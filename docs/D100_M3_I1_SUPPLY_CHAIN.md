@@ -10,7 +10,7 @@ La preuve D-098 existante est **CI_PROVEN** : Trivy scan, digest OCI, Cosign sig
 
 - `anchore/sbom-action@v0.24.0` produit un SBOM SPDX JSON pour une image jetable `proofs/d098`.
 - `anchore/scan-action@v7` exécute Grype sur le SBOM ; `fail-build=true`, `severity-cutoff=high`. Rapport JSON conservé.
-- `bridgecrewio/checkov-action@v12.1347.0` vérifie Dockerfile : `CKV_DOCKER_2` HEALTHCHECK et `CKV_DOCKER_3` USER. La fixture conforme doit réussir, l'invalide doit échouer **sur les deux check_ids**, pas à cause d'une erreur de téléchargement. Les résultats JSON sont lus pour confirmer le refus.
+- `bridgecrew/checkov:3.3.20` (CLI Docker) vérifie Dockerfile : `CKV_DOCKER_2` HEALTHCHECK et `CKV_DOCKER_3` USER. La fixture conforme doit réussir, l'invalide doit échouer **sur les deux check_ids**. La version action testée initialement ignorait le paramètre `file` et balayait tout le dépôt (CI échec); le CLI isolé corrige précisément ce problème. Les résultats JSON sont lus pour confirmer le refus.
 - GitHub Actions token `contents: read` ; pas de secrets ni accès à un vrai registre. Artifacts retenus 14 jours. Aucun workload modifié.
 
 ## Vérité des preuves
