@@ -70,51 +70,45 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir -p reports
-      - name: Check compliant fixture
-        id: good
-        uses: bridgecrewio/checkov-action@v12.1347.0
-        with:
-          file: proofs/d100/good/Dockerfile
-          framework: dockerfile
-          check: CKV_DOCKER_2,CKV_DOCKER_3
-          soft_fail: "false"
-          skip_results_upload: "true"
-          output_format: json
-          output_file_path: reports/checkov-good.json,
-      - name: Deliberately reject insecure fixture
-        id: bad
-        continue-on-error: true
-        uses: bridgecrewio/checkov-action@v12.1347.0
-        with:
-          file: proofs/d100/bad/Dockerfile
-          framework: dockerfile
-          check: CKV_DOCKER_2,CKV_DOCKER_3
-          soft_fail: "false"
-          skip_results_upload: "true"
-          output_format: json
-          output_file_path: reports/checkov-bad.json,
-      - name: Assert actual Checkov positives and negatives
-        env:
-          GOOD_OUTCOME: ${{ steps.good.outcome }}
-          BAD_OUTCOME: ${{ steps.bad.outcome }}
+      - name: Run Checkov 3.3.20 directly on isolated fixtures
         run: |
           set -euo pipefail
-          test "$GOOD_OUTCOME" = success
-          test "$BAD_OUTCOME" = failure
+          mkdir -p reports
+          IMAGE=bridgecrew/checkov:3.3.20
+          docker pull "$IMAGE"
+          docker image inspect "$IMAGE" --format '{{.Id}}'
+
+          docker run --rm -v "$PWD:/work" -w /work "$IMAGE" \
+            -f proofs/d100/good/Dockerfile \
+            --framework dockerfile \
+            --check CKV_DOCKER_2,CKV_DOCKER_3 \
+            --no-guide -o json > reports/checkov-good.json
+
+          set +e
+          docker run --rm -v "$PWD:/work" -w /work "$IMAGE" \
+            -f proofs/d100/bad/Dockerfile \
+            --framework dockerfile \
+            --check CKV_DOCKER_2,CKV_DOCKER_3 \
+            --no-guide -o json > reports/checkov-bad.json
+          BAD_RC=$?
+          set -e
+          test "$BAD_RC" -ne 0
+
           python3 - <<'PY'
           import json
           from pathlib import Path
+
           def checks(name):
               data=json.loads((Path("reports")/name).read_text())
               if isinstance(data,list):
                   assert len(data)==1
                   data=data[0]
               return data["results"]
+
           good=checks("checkov-good.json")
           bad=checks("checkov-bad.json")
           expected={"CKV_DOCKER_2","CKV_DOCKER_3"}
-          assert not good["failed_checks"]
+          assert not good["failed_checks"], "Compliant Dockerfile unexpectedly rejected"
           assert expected <= {x["check_id"] for x in good["passed_checks"]}
           assert expected <= {x["check_id"] for x in bad["failed_checks"]}
           print("D100_M3_CHECKOV_PASS=PASS")
