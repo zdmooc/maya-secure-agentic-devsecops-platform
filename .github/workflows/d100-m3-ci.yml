@@ -122,3 +122,90 @@ jobs:
           path: reports/*.json
           if-no-files-found: warn
           retention-days: 14
+
+  grype-negative:
+    name: Reject a known critical vulnerability (isolated, never executed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned vulnerable library as inert scan fixture
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/d100-m3-vulnerable
+          URL="https://repo.maven.apache.org/maven2/org/apache/logging/log4j/log4j-core/2.14.1/log4j-core-2.14.1.jar"
+          curl --fail --location --retry 3 --silent --show-error "$URL" \
+            --output /tmp/d100-m3-vulnerable/log4j-core-2.14.1.jar
+          curl --fail --location --retry 3 --silent --show-error "$URL.sha1" \
+            --output /tmp/d100-m3-vulnerable/log4j-core.sha1
+          cd /tmp/d100-m3-vulnerable
+          printf '%s  %s\n' "$(tr -d '\r\n ' < log4j-core.sha1)" log4j-core-2.14.1.jar \
+            | sha1sum -c -
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile("log4j-core-2.14.1.jar") as jar:
+              assert any("pom.properties" in p for p in jar.namelist())
+          print("D100_M3_VULNERABLE_FIXTURE_VERIFIED=PASS")
+          print("SAFETY: downloaded archive is scanned only, never executed/deployed")
+          PY
+      - name: Syft SBOM of known vulnerable JAR
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          path: /tmp/d100-m3-vulnerable
+          format: spdx-json
+          output-file: d100-m3-vulnerable.spdx.json
+          upload-artifact: "false"
+          upload-release-assets: "false"
+      - name: Assert specific vulnerable package discovered
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("d100-m3-vulnerable.spdx.json").read_text())
+          pkgs=data.get("packages",[])
+          found=[p for p in pkgs if "log4j-core" in p.get("name","").lower()
+                 and p.get("versionInfo")=="2.14.1"]
+          assert found, "Syft failed to catalog log4j-core 2.14.1"
+          print("D100_M3_VULNERABLE_SBOM_PACKAGE=PASS")
+          PY
+      - name: Grype MUST reject critical package
+        id: block
+        continue-on-error: true
+        uses: anchore/scan-action@v7
+        with:
+          sbom: d100-m3-vulnerable.spdx.json
+          fail-build: "true"
+          severity-cutoff: high
+          output-format: json
+          output-file: d100-m3-vulnerable-grype.json
+      - name: Verify genuine HIGH/CRITICAL vulnerability and enforcement
+        env:
+          GRYPE_OUTCOME: ${{ steps.block.outcome }}
+        run: |
+          set -euo pipefail
+          test "$GRYPE_OUTCOME" = failure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("d100-m3-vulnerable-grype.json").read_text())
+          matches=data.get("matches",[])
+          bad=[m for m in matches if m.get("vulnerability",{}).get("severity","").lower()
+                 in ("high","critical") and "log4j-core"
+                 in m.get("artifact",{}).get("name","").lower()]
+          assert bad, "Grype did not report HIGH/CRITICAL for log4j-core 2.14.1"
+          ids=[m.get("vulnerability",{}).get("id","") for m in bad]
+          assert "CVE-2021-44228" in ids, f"Expected CVE-2021-44228, found: {ids}"
+          print("D100_M3_GRYPE_HIGH_CRITICAL_NEGATIVE=PASS")
+          print("D100_M3_GRYPE_GENUINE_REJECTION=PASS")
+          print("CVE-2021-44228 VERIFIED")
+          PY
+      - name: Upload negative vulnerability proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d100-m3-grype-negative
+          path: |
+            d100-m3-vulnerable.spdx.json
+            d100-m3-vulnerable-grype.json
+          if-no-files-found: warn
+          retention-days: 14
