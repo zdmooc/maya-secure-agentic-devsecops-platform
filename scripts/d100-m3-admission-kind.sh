@@ -43,8 +43,24 @@ helm install kyverno kyverno/kyverno --version 3.5.2 \
   --set reportsController.enabled=false >/dev/null
 kubectl -n kyverno rollout status deploy/kyverno-admission-controller --timeout=180s
 kubectl apply -f "$ROOT/proofs/d100/admission/policy.yaml" >/dev/null
-kubectl wait clusterpolicy d100-m3-require-digest \
-  --for=jsonpath='{.status.ready}'=true --timeout=120s
+test "$(kubectl get clusterpolicy d100-m3-require-digest -o jsonpath='{.spec.rules[0].name}')" = require-image-digest
+# A policy can lack status.ready when ancillary controllers are disabled.
+# Probe the actual Kubernetes admission webhook instead of waiting for status.
+READY=no
+for attempt in $(seq 1 50); do
+  if kubectl create -f "$ROOT/proofs/d100/admission/bad-pod.yaml" \
+      --dry-run=server -o name > "$WORK/probe.out" 2> "$WORK/probe.err"; then
+    sleep 2
+    continue
+  fi
+  if grep -q 'd100-m3-require-digest' "$WORK/probe.err" &&
+      grep -q 'require-image-digest' "$WORK/probe.err"; then
+    READY=yes
+    break
+  fi
+  sleep 2
+done
+[ "$READY" = yes ]
 echo D100_M3_KYVERNO_WEBHOOK_READY=PASS
 
 # Actual API server-side dry run: webhook executes, but no image is pulled.
@@ -58,7 +74,8 @@ if kubectl create -f "$ROOT/proofs/d100/admission/bad-pod.yaml" \
   echo D100_M3_TAG_ADMISSION_REJECT=FAIL
   exit 1
 fi
-grep -Eiq 'kyverno|d100-m3-require-digest|require-image-digest' "$WORK/rejected.err"
+grep -q 'd100-m3-require-digest' "$WORK/rejected.err"
+grep -q 'require-image-digest' "$WORK/rejected.err"
 echo D100_M3_TAG_ADMISSION_REJECT=PASS
 
 sed 's/:latest/:1.36.1/' "$ROOT/proofs/d100/admission/bad-pod.yaml" \
@@ -68,7 +85,8 @@ if kubectl create -f "$WORK/nonlatest.yaml" --dry-run=server \
   echo D100_M3_VERSION_TAG_REJECT=FAIL
   exit 1
 fi
-grep -Eiq 'kyverno|d100-m3-require-digest|require-image-digest' "$WORK/rejected2.err"
+grep -q 'd100-m3-require-digest' "$WORK/rejected2.err"
+grep -q 'require-image-digest' "$WORK/rejected2.err"
 echo D100_M3_VERSION_TAG_REJECT=PASS
 
 sed 's/namespace: d100-m3-admission/namespace: default/' \
